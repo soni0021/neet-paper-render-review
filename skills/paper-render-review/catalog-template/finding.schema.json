@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/soni0021/neet-paper-render-review/skills/paper-render-review/catalog-template/finding.schema.json",
+  "title": "Render finding",
+  "description": "One anomaly one check found on one question in one review run. Runs write findings as JSONL, sorted by (position, field, check, locator), one object per line, keys in this order.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["finding_id", "paper_id", "position", "qid", "field", "check", "layer", "category", "severity", "locator", "message", "evidence", "pin"],
+  "properties": {
+    "finding_id": {
+      "type": "string",
+      "pattern": "^F-[0-9a-f]{12}$",
+      "description": "F- + first 12 hex of sha256(paper_id|qid|field|check|locator|profile). No timestamps: the same anomaly gets the same id in every run."
+    },
+    "paper_id": {"type": "string", "description": "The frozen paper id from manifest.json."},
+    "position": {"type": "integer", "minimum": 1, "description": "1-based question number in the paper."},
+    "qid": {"type": "string", "description": "Bank question_id (questions_clean)."},
+    "field": {"type": "string", "pattern": "^(question|image|option:[1-9]|solution|content|page)$"},
+    "check": {"type": "string", "pattern": "^[SDHVPX]-[A-Z0-9-]+$", "description": "Check id from taxonomy/render-bug-taxonomy.yaml."},
+    "layer": {"type": "string", "enum": ["static", "dom-chromium", "dom-android", "device", "visual", "parity", "cross"]},
+    "profile": {"type": "string", "description": "Device or desktop profile id, e.g. android-360dp-api35 or chromium-360css-dpr3. Empty for static and parity."},
+    "category": {"type": "string", "pattern": "^[A-Z]+\\.[A-Z_]+$", "description": "From the check's taxonomy mapping; replaced by the matched bug's category when catalog_match is set."},
+    "severity": {"type": "string", "enum": ["blocker", "major", "minor", "info"]},
+    "locator": {"type": "string", "description": "Field-relative DOM path from the probe, or a static locator such as math[3] / option:2.image."},
+    "message": {"type": "string"},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "snippet": {"type": "string", "maxLength": 200, "description": "Whitespace-normalised text near the anomaly. Private repo only: real question text."},
+        "metrics": {"type": "object"},
+        "screenshot": {"type": "string", "description": "Path relative to the run directory, e.g. shots/q017.png."},
+        "screenshot_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["app_sha", "probe"],
+      "properties": {
+        "app_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$", "description": "MentorBox monorepo commit whose renderer produced the page."},
+        "app_ref": {"type": "string", "description": "main, or the store build, e.g. 1.1.40+51."},
+        "katex": {"type": "string"},
+        "probe": {"type": "string", "description": "Probe VERSION string, e.g. mbqa-probe/1.0.0."},
+        "webview": {"type": "string", "description": "Android System WebView versionName (device layers only)."},
+        "chromium": {"type": "string", "description": "Desktop Chromium version (dom-chromium only)."}
+      }
+    },
+    "catalog_match": {"type": ["string", "null"], "pattern": "^RB-[0-9]{4}$", "description": "Set by triage: the catalog bug this finding is an occurrence of, or null when it is new."}
+  }
+}

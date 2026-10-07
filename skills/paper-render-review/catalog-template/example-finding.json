@@ -1,0 +1,23 @@
+{
+  "finding_id": "F-0123456789ab",
+  "paper_id": "example-paper",
+  "position": 17,
+  "qid": "EXAMPLE_Q017",
+  "field": "question",
+  "check": "D-MATCH-LAYOUT",
+  "layer": "dom-android",
+  "profile": "android-360dp-api35",
+  "category": "STRUCT.TYPE_MISSING_ON_PATH",
+  "severity": "blocker",
+  "locator": ".",
+  "message": "MATCH question without a two-column table",
+  "evidence": {
+    "snippet": "Match Column I with Column II. A. x B. y",
+    "metrics": {}
+  },
+  "pin": {
+    "app_sha": "0000000000000000000000000000000000000000",
+    "probe": "mbqa-probe/1.0.0"
+  },
+  "catalog_match": "RB-0001"
+}

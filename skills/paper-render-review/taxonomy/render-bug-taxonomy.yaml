@@ -1,0 +1,552 @@
+# Render bug taxonomy for NEET question papers shown in the MentorBox app.
+#
+# One category = one way a question looks wrong to a student AND one family of
+# fixes. Every finding a check produces maps to exactly one category, and every
+# bug in the catalog (catalog-template/) names one category.
+#
+# Stable ids: never rename or reuse a category id or a check id. Retire one by
+# setting `retired: <date>` and `superseded_by: <id>`.
+#
+# Severity scale (paper review gate):
+#   blocker  a student cannot read or answer the question correctly
+#   major    readable, but misleading, ugly, or needs effort to read
+#   minor    cosmetic
+#   info     signal for the reviewer, never counted against the gate
+#
+# Root-cause layers (where the fix goes):
+#   source-data      the question row itself (questions_clean / bank)
+#   importer         the PDF -> JSON -> bank pipeline that produced the row
+#   backend-payload  what the API sends for this render path
+#   app-mapper       JSON -> domain model in the app (drops or renames fields)
+#   app-renderer     normalize / sanitize / structure / HTML shell in the app
+#   katex            KaTeX or mhchem version / options
+#   webview          Android System WebView behaviour
+#   harness          the review harness itself (false positive or negative)
+#
+# Existing flag names this taxonomy absorbs:
+#   pipeline = neet-question-pipeline neet_pipeline/domain/qa_flags.py (QAFlag)
+#   qa_ts    = neet-qa-platform neet-renderer/src/types.ts (QaFlagCode)
+#   app_dart = mentorbox flutter_app neet_renderer/types.dart (QaFlagCode)
+#   sheet    = Bugs.xlsx sheet name
+#   baked    = qa-dashboard lib/baked.ts reason codes
+version: 1
+updated: 2026-10-07
+
+checks:
+  # ---- static: raw row + app pipeline output, no browser ----
+  S-STEM-EMPTY:          {layer: static, category: TEXT.EMPTY_STEM}
+  S-MOJIBAKE:            {layer: static, category: TEXT.ENCODING}
+  S-OPTION-COUNT:        {layer: static, category: OPTIONS.COUNT}
+  S-OPTION-EMPTY:        {layer: static, category: OPTIONS.EMPTY}
+  S-OPTION-DUP:          {layer: static, category: OPTIONS.DUPLICATE}
+  S-OPTION-IMAGE-DROPPED: {layer: static, category: MEDIA.OPTION_IMAGE_DROPPED}
+  S-KEY-INVALID:         {layer: static, category: KEY.INVALID}
+  S-TYPE-NOT-ON-PATH:    {layer: static, category: STRUCT.TYPE_MISSING_ON_PATH}
+  S-STRUCT-PARSE-FAILED: {layer: static, category: STRUCT.MATCH_LAYOUT_LOST}
+  S-STRUCT-TAG-LOSS:     {layer: static, category: STRUCT.CONTENT_LOST_IN_STRUCTURE}
+  S-OPTIONS-IN-STEM:     {layer: static, category: STRUCT.OPTIONS_IN_STEM}
+  S-TABLE-TEXT:          {layer: static, category: STRUCT.TABLE_MALFORMED}
+  S-KATEX-COMPILE:       {layer: static, category: MATH.PARSE_ERROR}
+  S-UNBALANCED-DOLLAR:   {layer: static, category: MATH.UNBALANCED_DELIMITER}
+  S-MATH-OUTSIDE-DELIMS: {layer: static, category: MATH.RAW_LATEX_VISIBLE}
+  S-BAKED-RESIDUE:       {layer: static, category: MATH.BAKED_RESIDUE}
+  S-PERCENT-IN-MATH:     {layer: static, category: MATH.SILENT_TRUNCATION}
+  S-DOUBLE-ESCAPE:       {layer: static, category: MATH.DOUBLE_ESCAPE}
+  S-EMPTY-MATH:          {layer: static, category: MATH.EMPTY}
+  S-INVISIBLE-CHAR:      {layer: static, category: MATH.INVISIBLE_CHARS}
+  S-CHEM-NO-CE:          {layer: static, category: MATH.CHEM_NOTATION}
+  S-MARKDOWN:            {layer: static, category: MARKUP.MARKDOWN_LITERAL}
+  S-ENTITY-LITERAL:      {layer: static, category: MARKUP.ESCAPED_HTML_VISIBLE}
+  S-STYLE-LAYOUT:        {layer: static, category: MARKUP.STYLE_STRIPPED_LAYOUT}
+  S-TAG-DROPPED:         {layer: static, category: MARKUP.TAG_DROPPED}
+  S-NEWLINE-COLLAPSE:    {layer: static, category: MARKUP.LINE_BREAKS_LOST}
+  S-RENDER-FALLBACK:     {layer: static, category: MARKUP.SANITIZER_FALLBACK}
+  S-IMG-NOT-LINKIFIED:   {layer: static, category: MEDIA.IMAGE_NOT_SHOWN}
+  S-IMG-UNREACHABLE:     {layer: static, category: MEDIA.IMAGE_BROKEN}
+  S-IMG-SRC-UNSAFE:      {layer: static, category: MEDIA.IMAGE_BROKEN}
+  S-IMG-DUP:             {layer: static, category: MEDIA.IMAGE_DUPLICATED}
+  # ---- dom: assets/probe.js, desktop Chromium AND Android WebView ----
+  D-KATEX-ERROR:         {layer: dom, category: MATH.PARSE_ERROR}
+  D-KATEX-UNDEFINED:     {layer: dom, category: MATH.PARSE_ERROR}
+  D-RAW-LATEX:           {layer: dom, category: MATH.RAW_LATEX_VISIBLE}
+  D-STRAY-DOLLAR:        {layer: dom, category: MATH.UNBALANCED_DELIMITER}
+  D-ZERO-MATH:           {layer: dom, category: LAYOUT.COLLAPSED}
+  D-LITERAL-MARKUP:
+    layer: dom
+    category: MARKUP.ESCAPED_HTML_VISIBLE
+    when:   # first rule whose regex matches metrics.match wins
+      - {metric: match, regex: '^(\*\*|!\[|\]\()', category: MARKUP.MARKDOWN_LITERAL}
+  D-LITERAL-URL:         {layer: dom, category: MEDIA.IMAGE_NOT_SHOWN}
+  D-MOJIBAKE:            {layer: dom, category: TEXT.ENCODING}
+  D-HCLIP:               {layer: dom, category: LAYOUT.HORIZONTAL_CLIP}
+  D-HSCROLL:             {layer: dom, category: LAYOUT.SCROLL_TRAPPED}
+  D-OVERLAP:             {layer: dom, category: LAYOUT.OVERLAP}
+  D-RUNON-LABELS:        {layer: dom, category: STRUCT.STATEMENTS_RUN_TOGETHER}
+  D-MATCH-LAYOUT:        {layer: dom, category: STRUCT.MATCH_LAYOUT_LOST}
+  D-TABLE-RAGGED:        {layer: dom, category: STRUCT.TABLE_MALFORMED}
+  D-IMG-BROKEN:          {layer: dom, category: MEDIA.IMAGE_BROKEN}
+  D-IMG-TINY:            {layer: dom, category: MEDIA.IMAGE_SIZE}
+  D-OPTION-COUNT:        {layer: dom, category: OPTIONS.COUNT}
+  D-OPTION-EMPTY:        {layer: dom, category: OPTIONS.EMPTY}
+  D-OPTION-DUP:          {layer: dom, category: OPTIONS.DUPLICATE}
+  D-HEIGHT-CLAMP:        {layer: dom, category: LAYOUT.HEIGHT_TRUNCATED}
+  D-NOT-READY:           {layer: dom, category: LAYOUT.NOT_READY}
+  D-FONT:                {layer: dom, category: LAYOUT.FONT_FALLBACK}
+  # ---- harness-observed on the device (not from the probe) ----
+  H-JS-ERROR:            {layer: device, category: LAYOUT.SCRIPT_ERROR}
+  H-NO-HEIGHT:           {layer: device, category: LAYOUT.NOT_READY}
+  H-LOAD-FAILED:         {layer: device, category: LAYOUT.NOT_READY}
+  # ---- visual: deterministic pixel statistics on the native screenshot ----
+  V-BLACK:               {layer: visual, category: LAYOUT.BLANK_OR_BLACK}
+  V-BLANK:               {layer: visual, category: LAYOUT.BLANK_OR_BLACK}
+  # ---- parity: QA dashboard renderer (TS) vs app renderer (Dart) ----
+  P-STRUCT-KIND:         {layer: parity, category: PARITY.QA_VS_APP}
+  P-FLAGS:               {layer: parity, category: PARITY.QA_VS_APP}
+  P-TEXT:                {layer: parity, category: PARITY.QA_VS_APP}
+  # ---- cross-layer: same check, different engines ----
+  X-ENGINE-DIFF:         {layer: cross, category: PARITY.ENGINE}
+
+categories:
+
+  # ===================== MATH =====================
+  MATH.PARSE_ERROR:
+    title: Math does not parse
+    student_sees: Red LaTeX source, or a red command name, where the formula should be.
+    default_severity: blocker
+    root_cause_layers: [source-data, importer, katex]
+    signals: [S-KATEX-COMPILE, D-KATEX-ERROR, D-KATEX-UNDEFINED]
+    maps: {pipeline: [katex_parse_error], qa_ts: [katex_parse_error], app_dart: [katex_parse_error], sheet: [katex_parse_error]}
+    synthetic_example: '$x^$  |  $30\,^\circ$  |  $\badmacro{x}$'
+    fix_playbook: >
+      Fix the TeX in the row (data fix). Known recipes: script with no base -> `{}^{2}`;
+      `\,^\circ` -> `\,{}^\circ` (the app's normalize already repairs this one; if it still
+      fires, the device runs an older build); unknown command -> its KaTeX equivalent or
+      `\text{}`. Only change the app when one rewrite would fix a whole pattern across the bank.
+  MATH.RAW_LATEX_VISIBLE:
+    title: LaTeX visible as text
+    student_sees: Backslash commands such as \alpha or \frac printed literally.
+    default_severity: blocker
+    root_cause_layers: [source-data, importer]
+    signals: [S-MATH-OUTSIDE-DELIMS, D-RAW-LATEX]
+    maps: {pipeline: [raw_latex_visible], sheet: [raw_latex_visible]}
+    synthetic_example: 'The value of \alpha is 2'
+    fix_playbook: Wrap the math in `$...$` (data fix). If an environment like `\begin{matrix}` is bare in a field that already has `$`, the app's normalize will not wrap it; wrap it in the data.
+  MATH.UNBALANCED_DELIMITER:
+    title: Unpaired $ delimiter
+    student_sees: A stray $ and the rest of the field either plain or wrongly italicised as math.
+    default_severity: blocker
+    root_cause_layers: [source-data, importer]
+    signals: [S-UNBALANCED-DOLLAR, D-STRAY-DOLLAR]
+    maps: {qa_ts: [unbalanced_delimiter], app_dart: [unbalanced_delimiter]}
+    synthetic_example: 'It costs $5 per kg and $x$ is real'
+    fix_playbook: Close or escape the delimiter by hand (never auto-close). Currency is `\$` or the word "Rs".
+  MATH.BAKED_RESIDUE:
+    title: Pre-rendered KaTeX HTML survived
+    student_sees: Doubled or overlapping glyphs, superscripts on the baseline, fractions collapsed.
+    default_severity: blocker
+    root_cause_layers: [source-data, app-renderer]
+    signals: [S-BAKED-RESIDUE]
+    maps: {qa_ts: [baked_presentation_html], sheet: [baked_presentation_html]}
+    synthetic_example: '<span class="katex"><span class="katex-mathml"><math>...</math></span><span class="katex-html">...</span></span> with no <annotation encoding="application/x-tex">'
+    fix_playbook: >
+      The app de-bakes `.katex` blocks that carry an `<annotation encoding="application/x-tex">`.
+      A block without the annotation keeps its text only. Replace the block with `$tex$` in the data.
+  MATH.SILENT_TRUNCATION:
+    title: Part of the formula silently disappears
+    student_sees: A formula that ends early; text after a % inside math is gone.
+    default_severity: blocker
+    root_cause_layers: [source-data]
+    signals: [S-PERCENT-IN-MATH]
+    maps: {sheet: [katex_parse_error]}
+    synthetic_example: '$50% of x$'
+    fix_playbook: Escape as `\%` (data fix).
+  MATH.DOUBLE_ESCAPE:
+    title: Double-escaped command
+    student_sees: A line break followed by the command name in plain letters.
+    default_severity: major
+    root_cause_layers: [source-data, importer]
+    signals: [S-DOUBLE-ESCAPE]
+    maps: {qa_ts: [double_escaped_command], app_dart: [double_escaped_command], sheet: [double_escaped_command]}
+    synthetic_example: '$\\alpha + \\beta$'
+    fix_playbook: Single-escape in the data. The app repairs a whitelist automatically but skips any field that contains `\begin{`.
+  MATH.EMPTY:
+    title: Empty math span
+    student_sees: Nothing, or a stray gap.
+    default_severity: minor
+    root_cause_layers: [source-data]
+    signals: [S-EMPTY-MATH]
+    maps: {qa_ts: [empty_math], app_dart: [empty_math], sheet: [empty_math]}
+    synthetic_example: 'Given $ $ and $$$$'
+    fix_playbook: Remove the empty delimiters (data fix).
+  MATH.INVISIBLE_CHARS:
+    title: Invisible characters inside math
+    student_sees: Usually a parse error; sometimes a missing symbol.
+    default_severity: major
+    root_cause_layers: [importer, source-data]
+    signals: [S-INVISIBLE-CHAR]
+    maps: {pipeline: [dropped_glyph_risk], sheet: [katex_parse_error]}
+    synthetic_example: '$x​^2$ (zero-width space)'
+    fix_playbook: Strip zero-width, combining and control characters inside math (data fix); add the stripping to the importer.
+  MATH.CHEM_NOTATION:
+    title: Chemistry written without mhchem
+    student_sees: Wrong subscripts (H2SO4 with italic letters and baseline digits), arrows in the wrong place.
+    default_severity: minor
+    root_cause_layers: [source-data, importer]
+    signals: [S-CHEM-NO-CE]
+    maps: {sheet: [katex_parse_error]}
+    synthetic_example: '$H2SO4$'
+    fix_playbook: Rewrite as `$\ce{H2SO4}$` (data fix). Heuristic check; never blocks on its own.
+
+  # ===================== MARKUP =====================
+  MARKUP.MARKDOWN_LITERAL:
+    title: Markdown shown literally
+    student_sees: '**bold** with the asterisks, ![](url) as text, # headings.'
+    default_severity: major
+    root_cause_layers: [importer, source-data, app-renderer]
+    signals: [S-MARKDOWN, D-LITERAL-MARKUP]
+    maps: {}
+    synthetic_example: '**Assertion (A):** x is real'
+    fix_playbook: >
+      The app renderer has no markdown support. Convert to HTML in the data (`<b>`, `<img src>`),
+      and stop the importer emitting markdown. Adding markdown to the app only helps new app builds.
+  MARKUP.ESCAPED_HTML_VISIBLE:
+    title: Escaped HTML or entities visible
+    student_sees: '&lt;sub&gt;2 or &amp;amp; printed literally.'
+    default_severity: major
+    root_cause_layers: [importer, source-data]
+    signals: [S-ENTITY-LITERAL, D-LITERAL-MARKUP]
+    maps: {qa_ts: [html_entities_decoded], app_dart: [html_entities_decoded], sheet: [html_entities_decoded]}
+    synthetic_example: 'H&amp;lt;sub&amp;gt;2&amp;lt;/sub&amp;gt;O'
+    fix_playbook: Decode once in the data; fix the double encoding in the importer.
+  MARKUP.STYLE_STRIPPED_LAYOUT:
+    title: Layout carried by inline style is lost
+    student_sees: Columns collapse into one run of text; side-by-side items stack or merge.
+    default_severity: major
+    root_cause_layers: [source-data, importer]
+    signals: [S-STYLE-LAYOUT]
+    maps: {pipeline: [table_not_html], baked: [not_match_structure, empty_left, empty_right]}
+    synthetic_example: '<div style="display:flex"><div>Column I ...</div><div>Column II ...</div></div>'
+    fix_playbook: The app sanitizer drops every `style` attribute. Store the layout as a real `<table>` (data fix).
+  MARKUP.TAG_DROPPED:
+    title: Semantic tag not allowed by the app sanitizer
+    student_sees: Underline on NOT or INCORRECT missing, colour emphasis missing, SVG or MathML missing.
+    default_severity: major
+    root_cause_layers: [source-data, app-renderer]
+    signals: [S-TAG-DROPPED]
+    maps: {qa_ts: [content_loss_risk]}
+    synthetic_example: 'Which statement is <u>NOT</u> correct?'
+    fix_playbook: >
+      `u`, `font`, `center`, `mark`, `math`, `svg`, `iframe` are unwrapped by the app sanitizer
+      (children kept, tag lost). Use `<b>` for emphasis in the data; propose an allowlist change
+      to the app only with a regression test.
+  MARKUP.LINE_BREAKS_LOST:
+    title: Line breaks collapse
+    student_sees: A list, statements or a passage run together in one paragraph.
+    default_severity: major
+    root_cause_layers: [source-data, importer]
+    signals: [S-NEWLINE-COLLAPSE]
+    maps: {pipeline: [multi_statement_malformed]}
+    synthetic_example: "Consider:\nI. x\nII. y"
+    fix_playbook: Replace meaningful `\n` with `<br>` in the data. HTML rendering treats `\n` as a space.
+  MARKUP.SANITIZER_FALLBACK:
+    title: Renderer fell back to escaped text
+    student_sees: The whole field as raw HTML source.
+    default_severity: blocker
+    root_cause_layers: [source-data, app-renderer]
+    signals: [S-RENDER-FALLBACK]
+    maps: {qa_ts: [render_error], app_dart: [render_error]}
+    synthetic_example: 'a field whose HTML makes the parser throw'
+    fix_playbook: Reproduce with the pinned app renderer, then fix the markup in the data; file an app bug with the minimal input.
+
+  # ===================== STRUCT =====================
+  STRUCT.TYPE_MISSING_ON_PATH:
+    title: Render path does not carry the question type
+    student_sees: Match questions as a stacked list, Assertion/Reason or statements without their layout.
+    default_severity: blocker
+    severity_rules:
+      - {when: 'bank_type in [ASSERTION_REASON, STATEMENT]', severity: major}
+    root_cause_layers: [backend-payload, app-mapper]
+    signals: [S-TYPE-NOT-ON-PATH]
+    maps: {}
+    synthetic_example: 'bank question_type MATCH; live exam payload has no type, so the app classifies it UNKNOWN'
+    fix_playbook: >
+      Code fix, two ends: the exam-time payload must send the type and the app's paper mapper must
+      read it. Until students have that build, the stem itself must carry its layout (a real
+      `<table>` for MATCH, `<br>` between statements), because the structure extractor never runs.
+  STRUCT.MATCH_LAYOUT_LOST:
+    title: Match the column layout lost
+    student_sees: Column I and Column II items in one run of text, or a table with empty or misaligned cells.
+    default_severity: blocker
+    root_cause_layers: [source-data, app-renderer, backend-payload]
+    signals: [S-STRUCT-PARSE-FAILED, D-MATCH-LAYOUT]
+    maps: {pipeline: [table_malformed], qa_ts: [structure_parse_failed], app_dart: [structure_parse_failed], sheet: [structure_parse_failed], baked: [count_mismatch, empty_item_text, missing_label, intro_dup, undefined_text, escape_artifact]}
+    synthetic_example: 'Match Column I with Column II. A. x B. y I. p II. q'
+    fix_playbook: Store a two-column `<table>` with labelled rows in the stem (data fix).
+  STRUCT.STATEMENTS_RUN_TOGETHER:
+    title: Enumerated statements on one line
+    student_sees: Statement I and Statement II (or Assertion and Reason) in one sentence.
+    default_severity: major
+    root_cause_layers: [source-data, backend-payload]
+    signals: [D-RUNON-LABELS]
+    maps: {pipeline: [assertion_reason_malformed, multi_statement_malformed]}
+    synthetic_example: 'Statement I: x is real. Statement II: y is real.'
+    fix_playbook: Put `<br>` before every label and bold the labels in the data (the app only does this when the type reaches it).
+  STRUCT.TABLE_MALFORMED:
+    title: Table malformed or not HTML
+    student_sees: Ragged rows, a pipe-delimited table as text, empty header cells.
+    default_severity: major
+    root_cause_layers: [importer, source-data]
+    signals: [S-TABLE-TEXT, D-TABLE-RAGGED]
+    maps: {pipeline: [table_malformed, table_not_html]}
+    synthetic_example: '| a | b |\n|---|---|\n| 1 | 2 |'
+    fix_playbook: Rebuild as an HTML `<table>` with equal row widths (data fix).
+  STRUCT.CONTENT_LOST_IN_STRUCTURE:
+    title: Markup inside structured cells is stripped
+    student_sees: Subscripts, superscripts or images missing inside match cells or A/R text.
+    default_severity: major
+    severity_rules:
+      - {when: 'lost tag is img', severity: blocker}
+    root_cause_layers: [app-renderer]
+    signals: [S-STRUCT-TAG-LOSS]
+    maps: {qa_ts: [content_loss_risk], pipeline: [content_drift]}
+    synthetic_example: '<table><tr><td>A. H<sub>2</sub>O</td><td>I. x</td></tr></table> (MATCH)'
+    fix_playbook: >
+      The app's structure extraction strips tags from cell text before rebuilding the table.
+      Data workaround: use `$\ce{H2O}$` / `$x^{2}$` math instead of `<sub>`/`<sup>` in cells.
+      App fix: keep inline tags when extracting cells (regression test with this example).
+  STRUCT.OPTIONS_IN_STEM:
+    title: Options repeated inside the stem
+    student_sees: The four options twice, once in the question text and once as tiles.
+    default_severity: major
+    root_cause_layers: [importer]
+    signals: [S-OPTIONS-IN-STEM]
+    maps: {pipeline: [options_in_stem]}
+    synthetic_example: 'Find x. (1) 2 (2) 3 (3) 4 (4) 5'
+    fix_playbook: Remove the option text from the stem (data fix); fix segmentation in the importer.
+
+  # ===================== MEDIA =====================
+  MEDIA.IMAGE_BROKEN:
+    title: Image does not load
+    student_sees: An empty box or nothing where the diagram should be.
+    default_severity: blocker
+    root_cause_layers: [source-data, importer]
+    signals: [S-IMG-UNREACHABLE, S-IMG-SRC-UNSAFE, D-IMG-BROKEN]
+    maps: {pipeline: [image_missing, image_unreachable], qa_ts: [image_unreachable], sheet: [image_unreachable]}
+    synthetic_example: '<img src="https://bucket.invalid/missing.png">'
+    fix_playbook: Re-upload to a NEW object key and point the row at it (never overwrite a key a published paper uses). Encode spaces and quotes in URLs.
+  MEDIA.IMAGE_NOT_SHOWN:
+    title: Image URL present but not rendered
+    student_sees: A URL or ![](...) as text, and no figure.
+    default_severity: blocker
+    root_cause_layers: [source-data, app-renderer]
+    signals: [S-IMG-NOT-LINKIFIED, D-LITERAL-URL]
+    maps: {}
+    synthetic_example: '![fig](https://bucket.invalid/fig.png)  |  https://bucket.invalid/FIG.PNG  |  https://bucket.invalid/fig.png?X-Amz-Signature=...'
+    fix_playbook: >
+      The app turns bare URLs ending in a lowercase png/jpg/jpeg/gif/webp/bmp/svg into images, but
+      skips URLs inside markdown `](...)` and does not match upper-case extensions or a query string
+      after the extension. Store `<img src="...">` in the data, or move the URL to the image column.
+  MEDIA.OPTION_IMAGE_DROPPED:
+    title: Option image not rendered on this path
+    student_sees: An empty option tile (or text without its figure).
+    default_severity: blocker
+    root_cause_layers: [app-mapper, app-renderer]
+    signals: [S-OPTION-IMAGE-DROPPED]
+    maps: {pipeline: [empty_option_text]}
+    synthetic_example: 'options: [{"id":"1","text":"","image":"https://bucket.invalid/o1.png"}, ...]'
+    fix_playbook: >
+      The exam-time payload keeps the option `image`, but the app mapper keeps only `id` and `text`
+      and the renderer never draws option images. Data workaround: put `<img src>` into the option
+      `text`. App fix: carry and render option images (two files, plus a regression test).
+  MEDIA.IMAGE_SIZE:
+    title: Image too small or oddly sized
+    student_sees: An unreadable thumbnail.
+    default_severity: minor
+    root_cause_layers: [source-data, importer]
+    signals: [D-IMG-TINY]
+    maps: {}
+    synthetic_example: 'a 10x10 crop'
+    fix_playbook: Replace with the full-resolution crop (data fix).
+  MEDIA.IMAGE_DUPLICATED:
+    title: Same image shown twice
+    student_sees: The diagram in the text and again under it.
+    default_severity: minor
+    root_cause_layers: [importer, source-data]
+    signals: [S-IMG-DUP]
+    maps: {pipeline: [image_duplicate]}
+    synthetic_example: 'stem has <img src=X> and the image column is also X'
+    fix_playbook: Keep one (data fix).
+
+  # ===================== OPTIONS =====================
+  OPTIONS.COUNT:
+    title: Wrong number of options
+    student_sees: Three or five option tiles.
+    default_severity: blocker
+    root_cause_layers: [importer, source-data, app-mapper]
+    signals: [S-OPTION-COUNT, D-OPTION-COUNT]
+    maps: {}
+    synthetic_example: '3 options'
+    fix_playbook: Restore the missing option from the source paper (data fix).
+  OPTIONS.EMPTY:
+    title: Empty option
+    student_sees: A tile with only a letter.
+    default_severity: blocker
+    root_cause_layers: [importer, source-data, app-mapper]
+    signals: [S-OPTION-EMPTY, D-OPTION-EMPTY]
+    maps: {pipeline: [empty_option_text]}
+    synthetic_example: '{"id":"2","text":""}'
+    fix_playbook: Fill from the source paper; if the option is image-only, see MEDIA.OPTION_IMAGE_DROPPED.
+  OPTIONS.DUPLICATE:
+    title: Two options render the same
+    student_sees: Identical tiles.
+    default_severity: major
+    root_cause_layers: [importer, source-data]
+    signals: [S-OPTION-DUP, D-OPTION-DUP]
+    maps: {pipeline: [duplicate_option_text], qa_ts: [duplicate_option_text], app_dart: [duplicate_option_text], sheet: [duplicate_option_text]}
+    synthetic_example: '["$2$","$2$","$3$","$4$"]'
+    fix_playbook: Restore the real option text (data fix).
+
+  # ===================== KEY (scoring integrity) =====================
+  KEY.INVALID:
+    title: Answer key missing, ambiguous or inconsistent
+    student_sees: Nothing during the exam; a wrong score afterwards.
+    default_severity: blocker
+    root_cause_layers: [source-data, importer]
+    signals: [S-KEY-INVALID]
+    maps: {pipeline: [no_correct_option, multiple_correct_options, answer_not_in_options, answer_matches_wrong_option], qa_ts: [no_correct_option, multiple_correct_options, answer_not_in_options, answer_matches_wrong_option], app_dart: [no_correct_option, multiple_correct_options, answer_not_in_options, answer_matches_wrong_option], sheet: [no_correct_option, multiple_correct_options, answer_not_in_options, answer_matches_wrong_option]}
+    synthetic_example: 'answer_option_id "5" with options 1..4'
+    fix_playbook: A human with the official key decides; the data fix sets the key. Never guess.
+
+  # ===================== TEXT =====================
+  TEXT.EMPTY_STEM:
+    title: Empty question text
+    student_sees: Options with no question.
+    default_severity: blocker
+    root_cause_layers: [importer, source-data]
+    signals: [S-STEM-EMPTY]
+    maps: {pipeline: [empty_question]}
+    synthetic_example: '""'
+    fix_playbook: Restore from the source paper (data fix).
+  TEXT.ENCODING:
+    title: Mis-decoded characters
+    student_sees: 'Ã©, â€™ or the � replacement character.'
+    default_severity: major
+    root_cause_layers: [importer]
+    signals: [S-MOJIBAKE, D-MOJIBAKE]
+    maps: {}
+    synthetic_example: 'Itâ€™s'
+    fix_playbook: Re-decode as UTF-8 in the data; fix the importer's decoding.
+
+  # ===================== LAYOUT (needs a real layout engine) =====================
+  LAYOUT.HORIZONTAL_CLIP:
+    title: Content cut off at the right edge
+    student_sees: A formula, table or image that stops mid-way with no scrollbar (the page hides horizontal overflow).
+    default_severity: blocker
+    root_cause_layers: [source-data, app-renderer]
+    signals: [D-HCLIP]
+    maps: {}
+    synthetic_example: '$\frac{a very long unbreakable numerator}{b}$ in an option'
+    fix_playbook: Break the formula (split, `\\` inside an aligned environment, smaller fraction) in the data; an app CSS change needs a regression test at 360 CSS px.
+  LAYOUT.SCROLL_TRAPPED:
+    title: Content needs horizontal scrolling inside the question
+    student_sees: Display math or a table that only shows fully if the student discovers a sideways swipe.
+    default_severity: major
+    root_cause_layers: [source-data, app-renderer]
+    signals: [D-HSCROLL]
+    maps: {}
+    synthetic_example: '$$a_0+a_1+...+a_59$$'
+    fix_playbook: Break the display math across lines in the data.
+  LAYOUT.HEIGHT_TRUNCATED:
+    title: Bottom of the question cut off
+    student_sees: The last option(s) missing; the page simply ends.
+    default_severity: blocker
+    root_cause_layers: [source-data, app-renderer]
+    signals: [D-HEIGHT-CLAMP]
+    maps: {}
+    synthetic_example: 'a very tall diagram plus a long stem: more than 8000 physical px'
+    fix_playbook: QuestionWebView caps height at 8000 physical px. Shrink or crop the image, or split the passage (data fix).
+  LAYOUT.OVERLAP:
+    title: Blocks overlap
+    student_sees: Text drawn over other text or over an image.
+    default_severity: major
+    root_cause_layers: [source-data, app-renderer, webview]
+    signals: [D-OVERLAP]
+    maps: {}
+    synthetic_example: 'negative margins or absolute positioning carried in from source HTML'
+    fix_playbook: Find which markup positions the block; remove it in the data.
+  LAYOUT.COLLAPSED:
+    title: Content present but zero size
+    student_sees: A gap where math should be.
+    default_severity: blocker
+    root_cause_layers: [app-renderer, source-data]
+    signals: [D-ZERO-MATH]
+    maps: {}
+    synthetic_example: 'a .katex block whose sizing styles were stripped'
+    fix_playbook: Usually baked KaTeX without an annotation; see MATH.BAKED_RESIDUE.
+  LAYOUT.NOT_READY:
+    title: Question never finished rendering
+    student_sees: Blank space, or "Couldn't load this question" with Retry.
+    default_severity: blocker
+    root_cause_layers: [app-renderer, webview, harness]
+    signals: [D-NOT-READY, H-NO-HEIGHT, H-LOAD-FAILED]
+    maps: {}
+    synthetic_example: 'an image that never completes, or a script error before the height is posted'
+    fix_playbook: Read the JS error and the probe readiness state first; reproduce on the device; then decide data vs app.
+  LAYOUT.SCRIPT_ERROR:
+    title: JavaScript error in the question page
+    student_sees: Often nothing visible; sometimes blank space or unrendered math.
+    default_severity: major
+    root_cause_layers: [app-renderer, source-data, webview]
+    signals: [H-JS-ERROR]
+    maps: {}
+    synthetic_example: 'QuestionWebView JS error: katex: ...'
+    fix_playbook: Reproduce with the pinned app; a data-triggered error gets a data fix plus an app bug.
+  LAYOUT.FONT_FALLBACK:
+    title: Math fonts not loaded
+    student_sees: Math in a system font, misaligned roots and fractions.
+    default_severity: major
+    root_cause_layers: [app-renderer, webview, harness]
+    signals: [D-FONT]
+    maps: {}
+    synthetic_example: 'KaTeX css loaded but woff2 fonts 404'
+    fix_playbook: Check the local KaTeX server and asset list in the pinned app; usually a harness or asset bug, not data.
+  LAYOUT.BLANK_OR_BLACK:
+    title: Screen black or blank
+    student_sees: A black rectangle or an empty card.
+    default_severity: blocker
+    root_cause_layers: [webview, app-renderer, harness]
+    signals: [V-BLACK, V-BLANK]
+    maps: {}
+    synthetic_example: 'a secure window (screenshots black) or a platform-view surface that never painted'
+    fix_playbook: Rule out the harness first (secure window, locked screen). A real one is an app bug for the device profile.
+
+  # ===================== PARITY =====================
+  PARITY.QA_VS_APP:
+    title: QA dashboard and app render differently
+    student_sees: Something the reviewer never saw in the dashboard.
+    default_severity: major
+    root_cause_layers: [harness, app-renderer]
+    signals: [P-STRUCT-KIND, P-FLAGS, P-TEXT]
+    maps: {}
+    synthetic_example: 'dashboard shows a MATCH table, app shows plain text'
+    fix_playbook: Port the app's behaviour into the dashboard renderer (the app is what students see), add the case to the shared parity fixtures.
+  PARITY.ENGINE:
+    title: Desktop Chromium and the Android WebView disagree
+    student_sees: Depends; the Android result is the truth.
+    default_severity: info
+    root_cause_layers: [webview, harness]
+    signals: [X-ENGINE-DIFF]
+    maps: {}
+    synthetic_example: 'D-HCLIP on the device only'
+    fix_playbook: Trust the device. If the desktop pass keeps missing a class of bug, tune the desktop profile (fonts, viewport) and record why.
+
+  # ===================== HARNESS =====================
+  HARNESS.FALSE_POSITIVE:
+    title: A check fired on a question that renders correctly
+    student_sees: Nothing.
+    default_severity: info
+    root_cause_layers: [harness]
+    signals: []
+    maps: {}
+    synthetic_example: 'a deliberately literal "$" inside \text{}'
+    fix_playbook: Fix the check and add the case to the probe self-test. Never suppress by editing the data.

@@ -1,0 +1,10 @@
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+# Never commit review outputs here: they contain real questions.
+runs/
+papers/
+shots/
+*.png
+!skills/paper-render-review/assets/**/*.svg

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/soni0021/neet-paper-render-review/skills/paper-render-review/catalog-template/bug.schema.json",
+  "title": "Render bug (catalog entry)",
+  "description": "One known rendering bug: a reusable signature that matches future findings, the root cause, and the fix recipe. The catalog is append-only JSONL (catalog/bugs.jsonl), one bug per line, ordered by id. It lives in the PRIVATE QA repo because occurrences name real question ids.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "category", "status", "severity", "signature", "root_cause", "fix", "synthetic_repro", "first_seen", "occurrences"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^RB-[0-9]{4}$", "description": "Next free number. Never reused."},
+    "title": {"type": "string", "maxLength": 100, "description": "What a student sees, in plain words."},
+    "category": {"type": "string", "pattern": "^[A-Z]+\\.[A-Z_]+$", "description": "One category id from taxonomy/render-bug-taxonomy.yaml."},
+    "status": {"type": "string", "enum": ["open", "data-fix-staged", "fixed-in-data", "fixed-in-app", "fixed-in-importer", "wontfix", "duplicate", "false-positive"]},
+    "duplicate_of": {"type": "string", "pattern": "^RB-[0-9]{4}$"},
+    "severity": {"type": "string", "enum": ["blocker", "major", "minor", "info"]},
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checks"],
+      "description": "How triage recognises a new finding as this bug. A finding matches when its check is in `checks` AND every present constraint holds. When several bugs match, the one with the most constraints wins; ties go to the lower id.",
+      "properties": {
+        "checks": {"type": "array", "items": {"type": "string", "pattern": "^[SDHVPX]-[A-Z0-9-]+$"}, "minItems": 1},
+        "fields": {"type": "array", "items": {"type": "string"}, "description": "Restrict to fields, e.g. [\"question\"] or [\"option:*\"]."},
+        "evidence_regex": {"type": "string", "description": "Regex (ECMAScript / Python compatible subset) over evidence.snippet + ' ' + JSON(metrics)."},
+        "raw_regex": {"type": "string", "description": "Regex over the raw source field the finding points at."},
+        "paths": {"type": "array", "items": {"type": "string", "enum": ["live", "practice", "analysis", "bookmark", "qotd", "any"]}, "description": "Render paths where the bug appears (live = live/mock exam)."},
+        "app_sha_range": {"type": "string", "description": "Optional '<first-bad-sha>..<fixed-sha>' so findings from builds that contain the fix stop matching."}
+      }
+    },
+    "root_cause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layer", "explanation"],
+      "properties": {
+        "layer": {"type": "string", "enum": ["source-data", "importer", "backend-payload", "app-mapper", "app-renderer", "katex", "webview", "harness"]},
+        "explanation": {"type": "string", "description": "Why it happens, with file:line at a named commit when it is code."},
+        "code_refs": {"type": "array", "items": {"type": "string"}, "description": "repo:path:line@sha"}
+      }
+    },
+    "fix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "recipe"],
+      "properties": {
+        "kind": {"type": "string", "enum": ["data", "app", "backend", "importer", "harness", "none"]},
+        "recipe": {"type": "string", "description": "Exact, repeatable steps. For data fixes: the before -> after transformation, e.g. a regex rewrite, so the next occurrence can be fixed the same way."},
+        "data_transform": {"type": "string", "description": "Optional machine-applicable rewrite, e.g. 's/\\\\,\\^/\\\\,{}^/g' on math segments. Staged, never auto-applied."},
+        "prs": {"type": "array", "items": {"type": "string"}},
+        "regression_test": {"type": "string", "description": "repo:path of the test that fails without the fix."},
+        "workaround_for_old_builds": {"type": "string", "description": "What to do in data for students on an app build without the fix."}
+      }
+    },
+    "synthetic_repro": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "input"],
+      "description": "A hand-written minimal input that reproduces the bug. Never real question text.",
+      "properties": {
+        "field": {"type": "string"},
+        "input": {"type": "string"},
+        "bank_type": {"type": "string"},
+        "expected_checks": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "first_seen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paper_id", "date"],
+      "properties": {"paper_id": {"type": "string"}, "date": {"type": "string", "format": "date"}, "reviewer": {"type": "string"}}
+    },
+    "occurrences": {
+      "type": "array",
+      "description": "Append one entry per paper review in which the bug was seen.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["paper_id", "date", "qids"],
+        "properties": {
+          "paper_id": {"type": "string"},
+          "date": {"type": "string", "format": "date"},
+          "qids": {"type": "array", "items": {"type": "string"}},
+          "finding_ids": {"type": "array", "items": {"type": "string"}},
+          "resolution": {"type": "string", "description": "e.g. fixed in data before the test, accepted by <name>."}
+        }
+      }
+    },
+    "related": {"type": "array", "items": {"type": "string", "pattern": "^RB-[0-9]{4}$"}},
+    "notes": {"type": "string"}
+  }
+}

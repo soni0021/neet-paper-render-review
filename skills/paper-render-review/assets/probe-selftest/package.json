@@ -1,0 +1,13 @@
+{
+  "name": "mbqa-probe-selftest",
+  "private": true,
+  "type": "module",
+  "description": "Self-test for the paper-render-review DOM probe",
+  "scripts": {
+    "test": "node selftest.mjs"
+  },
+  "devDependencies": {
+    "katex": "0.16.11",
+    "playwright": "1.60.0"
+  }
+}
