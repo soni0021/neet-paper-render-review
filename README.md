@@ -36,7 +36,7 @@ cd <your neet-qa-platform or mentorbox checkout>
 npx --yes skills add soni0021/neet-paper-render-review -y
 ```
 
-That copies `skills/paper-render-review/` into the project's skills folder. Or copy the folder by hand into `.claude/skills/paper-render-review/`. Check with `/skills` in Claude Code.
+That copies the skill to `.agents/skills/paper-render-review/`, links it from `.claude/skills/` for Claude Code, and records it in `skills-lock.json` (tested 2026-10-07). In the MentorBox monorepo, whose `.claude/` holds real files only (its ADR-001), copy the folder to `.claude/skills/paper-render-review/` instead of linking it. Check with `/skills` in Claude Code.
 
 ## Use
 
